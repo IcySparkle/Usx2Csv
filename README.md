@@ -1,197 +1,189 @@
-# UsxToCsv — USX → CSV Conversion Tool
-### PowerShell script for converting USX format to CSV.
+# UsxToCsv — Structured Verse-Level CSV Export from USX Scripture Files
 
----
+`UsxToCsv.ps1` is a PowerShell script that converts **USX (Unified Scripture XML)** files into structured **CSV** for Bible publishing, translation workflows, linguistic analysis, and typesetting systems such as Adobe InDesign.
 
-## 📌 Overview
-
-`UsxToCsv.ps1` converts **USX (Unified Scripture XML)** files into clean, structured **CSV** files suitable for:
-
-- Bible publishing pipelines  
-- InDesign Data Merge  
-- Text alignment and search systems  
-- Scripture QA and linguistic workflows  
-- Multi-version parallel Bibles  
-
-It handles complex USX constructs, including verse milestones, inline character markup, notes, and subtitles.
+The resulting CSV contains **one row per verse**, with clean plain text, optional styled text for GREP styling, extracted footnotes and cross-references, and section headings (subtitles).
 
 ---
 
 ## ✨ Key Features
 
-### ✔ Converts USX to CSV (1 row per verse)  
-Supports both **single file** and **entire folder** processing.
+### ✔ Verse-level structured output
+Each verse becomes a CSV row containing:
 
-### ✔ Clean, normalized text  
-- `TextPlain`: no inline markup  
-- `TextStyled`: simplified tags (`<wj>`, `<add>`, `<nd>`, `<i>`, `<b>`, etc.)
-
-### ✔ FT-only footnote extraction  
-Extracts **only** `<char style="ft">` content.  
-Ignores:
-- `caller="+"`
-- `fr` markers
-- note metadata  
-- nested USX markup is flattened into readable text.
-
-### ✔ Subtitle (Pericope Heading) Support  
-Recognizes heading styles:
-```
-s, s1, s2, s3, sp, ms, mr, mt, mt1, mt2
-```
-The latest subtitle applies to all following verses.
-
-### ✔ InDesign-friendly output  
-`TextStyled` is optimized for GREP styling.
-
----
-
-## 📂 CSV Output Columns
-
-| Column | Details |
+| Column | Meaning |
 |--------|---------|
-| `Book` | Book code (GEN, EXO, JHN, etc.) |
-| `Chapter` | Chapter number |
-| `Verse` | Verse number |
-| `TextPlain` | Raw readable text |
-| `TextStyled` | Inline formatted text |
-| `Footnotes` | FT-only text extracted from footnotes |
-| `Crossrefs` | FT-only cross-reference entries |
-| `Subtitle` | Section heading above the verse |
+| **Book** | USX `<book code="XXX">` |
+| **Chapter** | `<chapter number="N">` |
+| **Verse** | `<verse sid="...">` milestone number |
+| **TextPlain** | Clean verse text without inline styling |
+| **TextStyled** | Inline styles converted to light GREP-friendly tags |
+| **Footnotes** | Extracted FT-only footnotes (`<char style="ft">`) |
+| **Crossrefs** | Extracted FT-only cross references |
+| **Subtitle** | Nearest preceding section heading |
 
 ---
 
-## 🧠 How It Works
+## ✔ Accurate handling of USX verse milestones
 
-### 1. Verse Detection  
-Uses USX milestone structure:
+USX uses milestone-style verse markers:
 
 ```xml
-<verse sid="JHN 3:16" number="16"/>
+<verse sid="JHN 1:1" number="1"/>
 ...
-<verse eid="JHN 3:16"/>
+<verse eid="JHN 1:1"/>
 ```
 
-Text between the two is treated as one verse.
+This script:
+
+- Starts verse capture at `sid`
+- Ends capture at `eid`
+- Aggregates inner text, notes, and inline markup
+- Produces one complete row per verse
 
 ---
 
-### 2. Inline Formatting  
-USX:
+## ✔ Clean Text Extraction
 
-```xml
-<char style="wj">Jesus said…</char>
-```
+### **TextPlain**
+- All inline `<char>` tags stripped  
+- Notes removed  
+- Whitespace normalized  
+- `<char style="sup">…</char>` **skipped entirely**
 
-Becomes:
+### **TextStyled**
+Inline styles mapped for InDesign GREP use:
 
-```text
-<wj>Jesus said…</wj>
-```
+| USX style | Output tag |
+|-----------|------------|
+| `wj` | `<wj>` |
+| `add` | `<add>` |
+| `nd` | `<nd>` |
+| `it` | `<i>` |
+| `bd` | `<b>` |
+| `bdit` | `<bdit>` |
+| *(others)* | `<span>` |
 
 ---
 
-### 3. Footnote Extraction  
-USX:
+## ✔ Footnotes & Cross-References (FT-only)
+
+Only FT-text is extracted from notes:
 
 ```xml
 <note style="f">
-  <char style="fr">1:11</char>
-  <char style="ft"><ref loc="ISA 50:9">Is 50:9</ref></char>
+    <char style="fr">1:12</char>
+    <char style="ft">Some manuscripts say...</char>
 </note>
 ```
 
-Output:
+Classification:
+
+- Styles beginning with **x** → Crossrefs  
+- All others → Footnotes  
+
+Multiple entries are joined with ` | `.
+
+---
+
+## ✔ Subtitle Handling
+
+Recognized heading styles:
 
 ```
-Is 50:9
+s, s1, s2, s3, sp
+ms, mr
+mt, mt1, mt2
+```
+
+Each verse row inherits the latest subtitle until another appears.
+
+---
+
+## 📁 Example CSV Row
+
+```
+Book,Chapter,Verse,TextPlain,TextStyled,Footnotes,Crossrefs,Subtitle
+3JN,1,1,"The elder to the beloved Gaius...","<bdit>The elder</bdit> to the beloved...",,"","Greeting"
 ```
 
 ---
 
-### 4. Subtitle Assignment  
-
-```xml
-<para style="s1">The Birth of Jesus</para>
-```
-
-Applies to all verses until another heading appears.
-
----
-
-## 🚀 Usage
+# 🚀 Usage
 
 ### Convert a single USX file
+
 ```powershell
-.\UsxToCsv.ps1 -InputPath "C:\Bible\JHN.usx"
+.\UsxToCsv.ps1 -InputPath ".\JHN.usx"
 ```
 
-### Convert all USX in a folder
+### Convert all USX files in a folder
+
 ```powershell
-.\UsxToCsv.ps1 -InputPath "C:\Bible\USX"
+.\UsxToCsv.ps1 -InputPath ".\USX"
 ```
 
-### Use a custom output directory
+### Specify output folder
+
 ```powershell
-.\UsxToCsv.ps1 -InputPath "C:\Bible\USX" -OutputFolder "C:\Bible\CSV"
+.\UsxToCsv.ps1 -InputPath ".\USX" -OutputFolder ".\CSV"
+```
+
+CSV files default to the same folder as the source.
+
+---
+
+# 🧠 Implementation Notes
+
+### Verse milestones
+- `sid` = start  
+- `eid` = end  
+
+### Inline superscripts removed
+`<char style="sup">` content is intentionally **ignored**.
+
+### Whitespace normalization
+All internal spacing compressed to a clean single-space layout.
+
+---
+
+# 📦 Output Files
+
+```
+Input:  JHN.usx
+Output: JHN.csv
 ```
 
 ---
 
-## 🔧 Script Architecture
+# 🛠 Recommended Use Cases
 
-Core functions:
-
-- `Get-AttrValue` — Safe XML attribute getter  
-- `Find-FtNode` — Locates `<char style="ft">` inside notes  
-- `ExtractFTFromNote` — Returns FT text only  
-- `Get-PlainInnerText` — Cleans heading text  
-- `Get-StyledTagName` — Maps USX inline styles  
-- `Process-Node` — Main XML walker  
-- `Process-NoteNode` — Handles footnotes & crossrefs  
-- `Add-CurrentVerse` — Builds final CSV row  
+- Bible typesetting pipelines
+- Translation QA workflows
+- Linguistic analysis tools
+- Scripture content review systems
+- Machine learning preprocessing
 
 ---
 
-## 🧪 Testing
+# 🤝 Contributing
 
-Recommended books:
-- 1 John  
-- John  
-- Romans  
+Enhancements welcome! Particularly:
 
-Check:
-- Verse boundaries  
-- Subtitle propagation  
-- FT-only note extraction  
-- Inline tag formatting  
+- Poetry-level tagging
+- Multi-book USX support
+- Custom inline-style mappings
+- JSON/Parquet output options
 
 ---
 
-## 🧭 Roadmap
+# 📜 License
 
-Future enhancements (optional):
-
-- Poetry indentation (`q1`, `q2`, `q3`)  
-- Subtitle index CSV  
-- Parallel Bible merging  
-- Configurable inline-style mapping (JSON)  
-- USFM export option  
+MIT License — Free for commercial and non‑commercial use.
 
 ---
 
-## 📄 License
+# 🙌 Acknowledgements
 
-MIT License — free for ministry, research, publishing, and commercial use.
-
----
-
-## 💬 Contributions & Support
-
-If you need:
-- new features  
-- workflow integration  
-- script customization  
-
-Feel free to ask or open an issue.
-
+Inspired by real-world Scripture publishing and translation workflows.  
+Designed for compatibility with Paratext, DBL USX exports, and professional typesetting systems.
