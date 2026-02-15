@@ -81,3 +81,11 @@ docker run -p 8080:8080 usxtocsv-web
 - PowerShell: 5.1 or 7+
 - Node: 20+ for `web-ui`
 
+
+## Deferred Item Anti-Forgetting Protocol
+- If any task/decision is deferred, track it in three places in the same change set:
+  1. planning doc as an explicit exit criterion (phase plan, roadmap, or equivalent),
+  2. `REPO_MEMORY.md` as open/deferred work,
+  3. tests as a tracker (`it.todo`, pending test, or equivalent reminder).
+- Deferred items are not considered closed until the test tracker is converted into a passing assertion and the planning/memory entries are updated.
+- When deferred scope changes, update planning + memory + change log together so carryover work remains visible.
